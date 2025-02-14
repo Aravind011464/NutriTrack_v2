@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../viewmodels/auth_viewmodel.dart';
 import 'dashboard_view.dart';
 import 'login_view.dart';
+import 'user_details_view.dart';
 
 class SignUpView extends StatefulWidget {
   @override
@@ -160,7 +161,7 @@ class _SignUpViewState extends State<SignUpView> {
                           if (success) {
                             Navigator.pushReplacement(
                               context,
-                              MaterialPageRoute(builder: (context) => DashboardView()),
+                              MaterialPageRoute(builder: (context) => UserDetailsView()),
                             );
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
