@@ -136,10 +136,7 @@ class UserDetailsView extends StatelessWidget {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('User details saved!')),
                         );
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (context) => DashboardView()),
-                        );
+                        Navigator.pushReplacementNamed(context, '/mainApp');
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Color.fromRGBO(255, 209, 150, 1),
