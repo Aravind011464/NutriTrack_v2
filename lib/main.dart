@@ -85,4 +85,3 @@ class MainAppState extends State<MainApp> { // Remove the underscore
     );
   }
 }
-

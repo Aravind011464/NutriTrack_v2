@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'water_history_view.dart';
 
 class WaterIntakeView extends StatefulWidget {
   const WaterIntakeView({super.key});
@@ -15,14 +16,15 @@ class WaterIntakeView extends StatefulWidget {
 
 class _WaterIntakeViewState extends State<WaterIntakeView> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  int _selectedIndex = 1;
-  double waterConsumed = 1200; // ml
+  double waterConsumed = 0; // ml
   double waterGoal = 3000; // ml
-  double bottleCapacity = 1000; // ml, updated bottle capacity
+  double bottleCapacity = 1000; // ml
   double _tempWaterConsumed = 0; // Temporary water consumed since last refill
+  List<Map<String, dynamic>> dailyWaterRecords = [];
   List<Map<String, dynamic>> waterRecords = [];
   Timer? _timer;
   double _data = 0.0; // Current distance data
+  DateTime _currentDate = DateTime.now(); // Track the current date
   double _previousDistance = 0.0; // Previous distance data
 
   // Bottle dimensions
@@ -69,12 +71,23 @@ class _WaterIntakeViewState extends State<WaterIntakeView> with SingleTickerProv
     double currentVolume = pi * bottleRadius * bottleRadius * currentWaterHeight; // Volume in cm³
     double currentVolumeML = currentVolume; // 1 cm³ = 1 ml
 
+    // Check if the date has changed
+    if (_currentDate.day != DateTime.now().day) {
+      _currentDate = DateTime.now();
+      dailyWaterRecords.clear();
+      waterConsumed = 0;
+    }
+
     if (currentVolumeML > _tempWaterConsumed) {
       // Water level decreased, calculate water consumed
       int consumedAmount = (currentVolumeML - _tempWaterConsumed).floor();
       setState(() {
         waterConsumed += consumedAmount;
         _tempWaterConsumed = currentVolumeML;
+        dailyWaterRecords.add({
+          'time': DateTime.now(),
+          'amount': consumedAmount,
+        });
         waterRecords.add({
           'time': DateTime.now(),
           'amount': consumedAmount,
@@ -139,15 +152,18 @@ class _WaterIntakeViewState extends State<WaterIntakeView> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFB3E5FC),
+      backgroundColor: const Color(0xFF0D46CB), // Dark blue background
       appBar: AppBar(
-        backgroundColor: const Color.fromRGBO(7, 134, 232, 1),
-        title: const Text("Water Intake"),
+        backgroundColor: const Color(0xFF1F5ACE), // Lighter dark blue
+        title: const Text("Water Intake",style: TextStyle(color: Colors.white),),
       ),
       body: Column(
         children: [
           TabBar(
             controller: _tabController,
+            indicatorColor: Colors.cyanAccent,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white.withOpacity(0.6),
             tabs: const [
               Tab(text: "Today"),
               Tab(text: "History"),
@@ -163,11 +179,13 @@ class _WaterIntakeViewState extends State<WaterIntakeView> with SingleTickerProv
                     waterGoal: waterGoal,
                     bottleCapacity: bottleCapacity,
                     tempWaterConsumed: _tempWaterConsumed,
-                    waterRecords: waterRecords,
+                    waterRecords: dailyWaterRecords,
                     data: _data, // Pass the data to the content widget
                   ),
                 ),
-                //const WaterHistoryView(),
+                WaterHistoryView(
+                  waterRecords: waterRecords,
+                ),
               ],
             ),
           ),
@@ -405,7 +423,7 @@ class WaterIntakeContent extends StatelessWidget {
       itemCount: waterRecords.length,
       itemBuilder: (context, index) {
         final record = waterRecords.reversed.toList()[index]; // Reverse the list
-        final time = DateFormat.jm().format(record['time']);
+        final time = DateFormat('yyyy-MM-dd – HH:mm').format(record['time']);
         final amount = record['amount'];
 
         return Card(
