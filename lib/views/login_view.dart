@@ -3,6 +3,7 @@ import 'package:nutritrack_v2/views/signup_view.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/auth_viewmodel.dart';
 import 'dashboard_view.dart';
+import 'update_view.dart';
 
 class LoginView extends StatelessWidget {
   final TextEditingController emailController = TextEditingController();
@@ -18,7 +19,7 @@ class LoginView extends StatelessWidget {
       backgroundColor: const Color(0xFFFDF0DF),
       appBar: AppBar(
         title: Text(
-            "",
+          "",
           style: TextStyle(
             color: Colors.white,
           ),
@@ -120,10 +121,7 @@ class LoginView extends StatelessWidget {
                             passwordController.text,
                           );
                           if (success) {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(builder: (context) => DashboardView()),
-                            );
+                            Navigator.pushReplacementNamed(context, '/mainApp');
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text("Login Failed")),
