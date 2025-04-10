@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/user_details_viewmodel.dart';
 import 'dashboard_view.dart';
+import 'update_view.dart';
 
 class UserDetailsView extends StatelessWidget {
   @override
@@ -71,27 +72,27 @@ class UserDetailsView extends StatelessWidget {
                 ),
                 SizedBox(height: screenHeight * 0.02),
 
-        InkWell(
-          onTap: () async {
-            final DateTime? picked = await showDatePicker(
-              context: context,
-              initialDate: userDetailsViewModel.dateOfBirth ?? DateTime.now(),
-              firstDate: DateTime(1900),
-              lastDate: DateTime.now(),
-            );
-            if (picked != null) {
-              userDetailsViewModel.dateOfBirth = picked;
-            }
-          },
-          child: InputDecorator(
-            decoration: const InputDecoration(labelText: 'Date of Birth'),
-            child: Text(
-              userDetailsViewModel.dateOfBirth != null
-                  ? "${userDetailsViewModel.dateOfBirth!.toLocal()}".split(' ')[0]
-                  : 'Select date', // Ensures no default value is shown
-            ),
-          ),
-        ),
+                InkWell(
+                  onTap: () async {
+                    final DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: userDetailsViewModel.dateOfBirth ?? DateTime.now(),
+                      firstDate: DateTime(1900),
+                      lastDate: DateTime.now(),
+                    );
+                    if (picked != null) {
+                      userDetailsViewModel.dateOfBirth = picked;
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(labelText: 'Date of Birth'),
+                    child: Text(
+                      userDetailsViewModel.dateOfBirth != null
+                          ? "${userDetailsViewModel.dateOfBirth!.toLocal()}".split(' ')[0]
+                          : 'Select date', // Ensures no default value is shown
+                    ),
+                  ),
+                ),
                 SizedBox(height: screenHeight * 0.02),
 
                 DropdownButtonFormField<String>(
@@ -125,7 +126,20 @@ class UserDetailsView extends StatelessWidget {
                   },
                 ),
                 SizedBox(height: screenHeight * 0.05),
-
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(labelText: 'Gender'),
+                  value: userDetailsViewModel.gender,
+                  items: ['Male', 'Female'].map((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    userDetailsViewModel.gender = newValue;
+                  },
+                ),
+                SizedBox(height: screenHeight * 0.02),
                 Center(
                   child: SizedBox(
                     width: 150,

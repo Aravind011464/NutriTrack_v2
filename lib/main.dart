@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:nutritrack_v2/views/update_view.dart';
 import 'package:provider/provider.dart';
 import 'package:nutritrack_v2/views/homepage_view.dart';
 //import 'package:nutritrack_v2/views/signup_view.dart';
@@ -9,7 +10,6 @@ import 'package:nutritrack_v2/viewmodels/user_details_viewmodel.dart';
 import 'core/services/firebase_options.dart';
 import 'views/dashboard_view.dart';
 import 'views/water_intake_view.dart';
-
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -56,6 +56,7 @@ class MainAppState extends State<MainApp> { // Remove the underscore
   final List<Widget> _tabs = [
     const DashboardView(),
     const WaterIntakeView(),
+    UpdateView(),
     // Add other views here if needed
   ];
 

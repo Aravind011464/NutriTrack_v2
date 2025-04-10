@@ -22,6 +22,7 @@ class AuthViewModel extends ChangeNotifier {
         'dateOfBirth': null,
         'bloodGroup': null,
         'activityLevel': null,
+        'gender': null,
       });
 
       notifyListeners();

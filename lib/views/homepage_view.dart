@@ -42,12 +42,12 @@ class HomeView extends StatelessWidget {
                   padding: EdgeInsets.all(8.0),
                   child: Center(
                     child: Text(
-                        "Empowering healthier choices with personalized nutrition, hydration, and wellness tracking.",
+                      "Empowering healthier choices with personalized nutrition, hydration, and wellness tracking.",
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: Color.fromRGBO(232,134,7,1),
-                        fontWeight: FontWeight.normal,
-                        fontSize: 17
+                          color: Color.fromRGBO(232,134,7,1),
+                          fontWeight: FontWeight.normal,
+                          fontSize: 17
                       ),
                     ),
                   ),

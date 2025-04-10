@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:nutritrack_v2/views/bmr_view.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:percent_indicator/linear_percent_indicator.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/auth_viewmodel.dart';
-import 'water_intake_view.dart';
+import 'food_detail_view.dart';
 
 class DashboardView extends StatefulWidget {
   const DashboardView({super.key});
@@ -15,62 +16,62 @@ class DashboardView extends StatefulWidget {
 class _DashboardViewState extends State<DashboardView> {
   int _selectedIndex = 0;
 
-  final double caloriesConsumed = 1122;
+  late double caloriesConsumed = 0;
   final double calorieGoal = 2245;
-  final double proteinConsumed = 28;
+  late double proteinConsumed = 0;
   final double proteinGoal = 60;
-  final double carbConsumed = 100;
+  late double carbConsumed = 0;
   final double carbGoal = 225;
-  final double fatConsumed = 83;
+  late double fatConsumed = 0;
   final double fatGoal = 77;
 
   List<String> breakfastItems = [];
   List<String> lunchItems = [];
   List<String> dinnerItems = [];
 
-  void _showFoodSearchDialog(String mealType) {
-    showModalBottomSheet(
-      backgroundColor: Color.fromRGBO(250, 236, 217, 1),
-      context: context,
-      isScrollControlled: true,
-      builder: (context) {
-        return FoodSearchDialog(
-          onFoodSelected: (food, servings) {
-            setState(() {
-              final foodWithServings = "$food (x$servings)";
-              if (mealType == "Breakfast") {
-                breakfastItems.add(foodWithServings);
-              } else if (mealType == "Lunch") {
-                lunchItems.add(foodWithServings);
-              } else {
-                dinnerItems.add(foodWithServings);
-              }
-            });
-          },
-        );
-      },
+  static const Map<String, Map<String, double>> foodNutritionData = {
+    "Apple": {"calories": 95, "protein": 0.5, "carbs": 25, "fat": 0.3},
+    "Banana": {"calories": 105, "protein": 1.3, "carbs": 27, "fat": 0.3},
+    "Chicken": {"calories": 165, "protein": 31, "carbs": 0, "fat": 3.6},
+    "Rice": {"calories": 206, "protein": 4.3, "carbs": 45, "fat": 0.4},
+    "Broccoli": {"calories": 55, "protein": 3.7, "carbs": 11.2, "fat": 0.6},
+    // Add more as needed
+  };
+
+
+  void _showFoodSearchDialog(String mealType) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FoodSearchDialog(),
+      ),
     );
+
+    if (result != null && result is Map<String, dynamic>) {
+      setState(() {
+        final food = result['food'] as String;
+        final servings = result['servings'] as int;
+        final foodWithServings = "$food (x$servings)";
+
+        final foodData = foodNutritionData[food];
+        if (foodData != null) {
+          caloriesConsumed += (foodData["calories"]! * servings);
+          proteinConsumed += (foodData["protein"]! * servings);
+          carbConsumed += (foodData["carbs"]! * servings);
+          fatConsumed += (foodData["fat"]! * servings);
+        }
+
+        if (mealType == "Breakfast") {
+          breakfastItems.add(foodWithServings);
+        } else if (mealType == "Lunch") {
+          lunchItems.add(foodWithServings);
+        } else {
+          dinnerItems.add(foodWithServings);
+        }
+      });
+    }
   }
 
-  /*void _onTabTapped(int index) {
-    if (_selectedIndex == index) return; // Prevent unnecessary navigation
-
-    setState(() {
-      _selectedIndex = index;
-    });
-
-    if (index == 1) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => WaterIntakeView()),
-      );
-    } else if (index == 0) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => DashboardView()),
-      );
-    }
-  }*/
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +83,7 @@ class _DashboardViewState extends State<DashboardView> {
       appBar: AppBar(
         title: Text("Dashboard"),
         backgroundColor: Color.fromRGBO(247, 186, 106, 1),
+        automaticallyImplyLeading: false, // This removes the back button
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -143,19 +145,43 @@ class _DashboardViewState extends State<DashboardView> {
             _buildMealSection("Lunch", lunchItems),
             _buildMealSection("Dinner", dinnerItems),
             SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => BMRCalculator()),
+                );
+              },
+              child: Text(
+                "Get Food Recommendation",
+                style: TextStyle(color: Color.fromRGBO(250, 236, 217, 1)),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color.fromRGBO(232, 134, 7, 1),
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            SizedBox(height: 20,)
           ],
         ),
       ),
-      /*bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Food"),
-          BottomNavigationBarItem(icon: Icon(Icons.local_drink), label: "Water"),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: "Settings"),
-        ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: const Color.fromRGBO(232, 134, 7, 1),
-        onTap: _onTabTapped,
-      ),*/
+      // bottomNavigationBar: BottomNavigationBar(
+      //   items: const <BottomNavigationBarItem>[
+      //     BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+      //     BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+      //     BottomNavigationBarItem(icon: Icon(Icons.settings), label: "Settings"),
+      //   ],
+      //   currentIndex: _selectedIndex,
+      //   selectedItemColor: Color.fromRGBO(232, 134, 7, 1),
+      //   onTap: (index) {
+      //     setState(() {
+      //       _selectedIndex = index;
+      //     });
+      //   },
+      // ),
     );
   }
 
@@ -210,10 +236,31 @@ class _DashboardViewState extends State<DashboardView> {
               ),
             ],
           ),
-          ...items.map((food) => ListTile(
-            title: Text(food),
-            leading: Icon(Icons.fastfood, color: Colors.orange),
-          )),
+          ...items.map((foodEntry) {
+            final parts = foodEntry.split(' (x');
+            final foodName = parts[0];
+            final servings = parts.length > 1 ? parts[1].replaceAll(')', '') : '1';
+
+            return ListTile(
+              title: Text(foodEntry),
+              leading: Icon(Icons.fastfood, color: Colors.orange),
+              onTap: () async {
+                final updatedServings = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => FoodDetailView(foodName: foodName),
+                  ),
+                );
+
+                if (updatedServings != null) {
+                  setState(() {
+                    items.remove(foodEntry); // Remove old entry
+                    items.add('$foodName (x$updatedServings)'); // Add updated entry
+                  });
+                }
+              },
+            );
+          }),
         ],
       ),
     );
@@ -221,22 +268,16 @@ class _DashboardViewState extends State<DashboardView> {
 }
 
 class FoodSearchDialog extends StatefulWidget {
-  final Function(String, int) onFoodSelected;
-
-  FoodSearchDialog({required this.onFoodSelected});
-
   @override
   _FoodSearchDialogState createState() => _FoodSearchDialogState();
 }
 
 class _FoodSearchDialogState extends State<FoodSearchDialog> {
   final TextEditingController _searchController = TextEditingController();
-  final TextEditingController _servingsController = TextEditingController();
   List<String> foodList = [
     "Apple", "Banana", "Chicken", "Rice", "Broccoli", "Salmon", "Egg", "Milk", "Oatmeal", "Avocado"
   ];
   List<String> filteredFoods = [];
-  String? _selectedFood;
 
   @override
   void initState() {
@@ -252,109 +293,75 @@ class _FoodSearchDialogState extends State<FoodSearchDialog> {
     });
   }
 
-  void _addFood() {
-    final servings = int.tryParse(_servingsController.text) ?? 1; // Default to 1 if not valid
-    if (_selectedFood != null) {
-      widget.onFoodSelected(_selectedFood!, servings);
-      Navigator.pop(context);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
 
-    return Padding(
-      padding: EdgeInsets.all(20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              labelText: "Search Food",
-              labelStyle: TextStyle(color: Colors.orange),
-              border: OutlineInputBorder(),
-              enabledBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Color.fromRGBO(247, 186, 106, 1), width: 2.0),
-                borderRadius: BorderRadius.circular(10.0),
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Color.fromRGBO(247, 186, 106, 1),
+        title: Text("Select Food"),
+      ),
+      backgroundColor: Color.fromRGBO(250, 236, 217, 1),
+      body: Padding(
+        padding: EdgeInsets.all(20),
+        child: Column(
+          children: [
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                labelText: "Search Food",
+                labelStyle: TextStyle(color: Colors.orange),
+                border: OutlineInputBorder(),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Color.fromRGBO(247, 186, 106, 1), width: 2.0),
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Color.fromRGBO(232, 134, 7, 1), width: 2.5),
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
+                filled: true,
+                fillColor: Colors.white,
               ),
-              focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Color.fromRGBO(232, 134, 7, 1), width: 2.5),
-                borderRadius: BorderRadius.circular(10.0),
-              ),
-              filled: true,
-              fillColor: Colors.white,
+              onChanged: _filterFoodList,
             ),
-            onChanged: _filterFoodList,
-          ),
-          SizedBox(height: 10),
-          SizedBox(
-            height: screenHeight * 0.3, // Restricting to one-third of the screen height
-            child: Scrollbar( // Adds a scrollbar for better UX
+            SizedBox(height: 20),
+            Expanded(
               child: ListView.builder(
-                shrinkWrap: true,
-                padding: EdgeInsets.zero,
                 itemCount: filteredFoods.length,
                 itemBuilder: (context, index) {
-                  final isSelected = filteredFoods[index] == _selectedFood;
+                  final food = filteredFoods[index];
                   return ListTile(
                     title: Text(
-                      filteredFoods[index],
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Color.fromRGBO(201, 111, 0, 1),
-                        fontWeight: FontWeight.bold,
-                      ),
+                      food,
+                      style: TextStyle(fontWeight: FontWeight.bold, color: Color.fromRGBO(232, 134, 7, 1)),
                     ),
-                    tileColor: isSelected ? Color.fromRGBO(232, 134, 7, 1) : Colors.white, // Change background color
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                    ),
-                    onTap: () {
-                      setState(() {
-                        _selectedFood = filteredFoods[index]; // Set the selected food
-                      });
+                    onTap: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => FoodDetailView(foodName: food),
+                        ),
+                      );
+
+                      if (result != null && result is int) {
+                        Navigator.pop(context, {
+                          'food': food,
+                          'servings': result,
+                        });
+                      }
                     },
                   );
                 },
               ),
             ),
-          ),
-          SizedBox(height: 10),
-          TextField(
-            controller: _servingsController,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: "Enter Servings",
-              labelStyle: TextStyle(color: Colors.orange),
-              border: OutlineInputBorder(),
-              enabledBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Color.fromRGBO(247, 186, 106, 1), width: 2.0),
-                borderRadius: BorderRadius.circular(10.0),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Color.fromRGBO(232, 134, 7, 1), width: 2.5),
-                borderRadius: BorderRadius.circular(10.0),
-              ),
-              filled: true,
-              fillColor: Colors.white,
-            ),
-          ),
-          SizedBox(height: 10),
-          ElevatedButton(
-            onPressed: _addFood,
-            child: Text(
-              "Add Food",
-              style: TextStyle(
-                color: Color.fromRGBO(250, 236, 217, 1),
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color.fromRGBO(232, 134, 7, 1), // Orange color
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
+
+
+

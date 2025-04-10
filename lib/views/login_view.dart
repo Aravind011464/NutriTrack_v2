@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:nutritrack_v2/views/signup_view.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/auth_viewmodel.dart';
-import '../main.dart'; // Import the main.dart to access MainApp
+import 'dashboard_view.dart';
+import 'update_view.dart';
 
 class LoginView extends StatelessWidget {
   final TextEditingController emailController = TextEditingController();
@@ -25,17 +26,18 @@ class LoginView extends StatelessWidget {
         ),
         backgroundColor: Color.fromRGBO(247, 186, 106, 1),
         iconTheme: IconThemeData(
-          color: Colors.white,
+          color: Colors.white, // Change this to your desired color
         ),
       ),
       body: GestureDetector(
         onTap: () {
+          // Dismiss the keyboard when tapping outside the input fields
           FocusScope.of(context).unfocus();
         },
         child: SingleChildScrollView(
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              minHeight: screenHeight,
+              minHeight: screenHeight, // Prevents overflow
             ),
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: screenHeight * 0.05),

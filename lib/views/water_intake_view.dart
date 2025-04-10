@@ -17,19 +17,27 @@ class WaterIntakeView extends StatefulWidget {
 class _WaterIntakeViewState extends State<WaterIntakeView> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   double waterConsumed = 0; // ml
-  double waterGoal = 3000; // ml
-  double bottleCapacity = 1000; // ml
+  double waterGoal = 4000; // ml
+  double bottleCapacity = 1963; // ml
   double _tempWaterConsumed = 0; // Temporary water consumed since last refill
   List<Map<String, dynamic>> dailyWaterRecords = [];
   List<Map<String, dynamic>> waterRecords = [];
   Timer? _timer;
   double _data = 0.0; // Current distance data
   DateTime _currentDate = DateTime.now(); // Track the current date
-  double _previousDistance = 0.0; // Previous distance data
+  bool _hasShownRefillAlert = false; // Track if we've already shown the refill alert
+  bool _hasInitializedWaterLevel = false; // Track if we've initialized water level
+
+  // Stability tracking variables
+  double _lastStableReading = 0.0;
+  List<double> _recentReadings = [];
+  bool _isBottleClosed = true;
+  int _stableReadingsRequired = 4; // Number of consistent readings to confirm stability
+  double _stabilityThreshold = 0.5; // Maximum allowed variation for readings to be considered stable
 
   // Bottle dimensions
-  final double bottleRadius = 3.258; // cm
-  final double bottleHeight = 30.0; // cm
+  final double bottleRadius = 5; // cm
+  final double bottleHeight = 25; // cm
 
   @override
   void initState() {
@@ -37,6 +45,9 @@ class _WaterIntakeViewState extends State<WaterIntakeView> with SingleTickerProv
     _tabController = TabController(length: 2, vsync: this);
     _fetchData();
     _timer = Timer.periodic(Duration(seconds: 5), (Timer t) => _fetchData());
+
+    // Check for date change every minute
+    Timer.periodic(Duration(minutes: 1), (Timer t) => _checkForDateChange());
   }
 
   @override
@@ -46,6 +57,48 @@ class _WaterIntakeViewState extends State<WaterIntakeView> with SingleTickerProv
     super.dispose();
   }
 
+  void _checkForDateChange() {
+    final currentDate = DateTime.now();
+    if (_currentDate.day != currentDate.day ||
+        _currentDate.month != currentDate.month ||
+        _currentDate.year != currentDate.year) {
+      print("Date changed from ${DateFormat('yyyy-MM-dd').format(_currentDate)} to ${DateFormat('yyyy-MM-dd').format(currentDate)}");
+
+      // Save the current water reading before resetting
+      double lastReading = _lastStableReading;
+
+      setState(() {
+        _currentDate = currentDate;
+        waterConsumed = 0; // Reset water consumed for the new day
+        dailyWaterRecords = []; // Create a new list instead of clearing
+
+        // Don't reset these critical tracking variables
+        // _hasInitializedWaterLevel = false;
+
+        // Add the current water level as an initial reading for the new day
+        if (_hasInitializedWaterLevel) {
+          double waterColumnHeight = lastReading;
+          double waterVolume = pi * bottleRadius * bottleRadius * waterColumnHeight;
+          double initialAmount = bottleCapacity - waterVolume;
+
+          dailyWaterRecords.add({
+            'time': DateTime.now(),
+            'amount': initialAmount.floor(),
+            'note': 'Initial reading for new day',
+            'isInitial': true
+          });
+
+          waterRecords.add({
+            'time': DateTime.now(),
+            'amount': initialAmount.floor(),
+            'note': 'Initial reading for new day',
+            'isInitial': true
+          });
+        }
+      });
+    }
+  }
+
   Future<void> _fetchData() async {
     final url = "https://nutritrack-af35a-default-rtdb.asia-southeast1.firebasedatabase.app/sensor/distance.json";
     final response = await http.get(Uri.parse(url));
@@ -53,11 +106,18 @@ class _WaterIntakeViewState extends State<WaterIntakeView> with SingleTickerProv
     if (response.statusCode == 200) {
       final newData = jsonDecode(response.body);
       if (newData is num) {
+        double currentReading = 25 - newData.toDouble(); // Ensure it's a double
         setState(() {
-          _data = 30 - newData.toDouble(); // Ensure it's a double
-          _updateWaterIntake();
+          _data = currentReading;
+
+          // Initialize water level on first reading if we haven't done so already
+          if (!_hasInitializedWaterLevel) {
+            _initializeWaterLevel(currentReading);
+          } else {
+            _checkReadingStability(currentReading);
+          }
         });
-        print("Data has changed: $_data");
+        print("New reading: $currentReading");
       } else {
         print("Unexpected data format");
       }
@@ -66,43 +126,205 @@ class _WaterIntakeViewState extends State<WaterIntakeView> with SingleTickerProv
     }
   }
 
-  void _updateWaterIntake() {
-    double currentWaterHeight = bottleHeight - _data; // Height of water column
-    double currentVolume = pi * bottleRadius * bottleRadius * currentWaterHeight; // Volume in cm³
-    double currentVolumeML = currentVolume; // 1 cm³ = 1 ml
+  void _initializeWaterLevel(double currentReading) {
+    // Calculate water volume based on the first reading
+    double waterColumnHeight = currentReading;
+    double waterVolume = pi * bottleRadius * bottleRadius * waterColumnHeight;
+    double initialAmount = bottleCapacity - waterVolume;
 
-    // Check if the date has changed
-    if (_currentDate.day != DateTime.now().day) {
-      _currentDate = DateTime.now();
-      dailyWaterRecords.clear();
-      waterConsumed = 0;
-    }
+    setState(() {
+      _tempWaterConsumed = initialAmount;
+      // Only mark as initial if reading is -1
+      bool isInitialReading = currentReading == -1;
 
-    if (currentVolumeML > _tempWaterConsumed) {
-      // Water level decreased, calculate water consumed
-      int consumedAmount = (currentVolumeML - _tempWaterConsumed).floor();
-      setState(() {
-        waterConsumed += consumedAmount;
-        _tempWaterConsumed = currentVolumeML;
+      // Do NOT add initial amount to total consumption at start of day
+      // Only track the current level for water remaining calculations
+
+      _hasInitializedWaterLevel = true;
+      _lastStableReading = currentReading; // Set as our first stable reading
+
+      // Add initial record but don't count it toward consumption
+      // Only mark as 'initial' if reading is -1
+      if (isInitialReading) {
         dailyWaterRecords.add({
           'time': DateTime.now(),
-          'amount': consumedAmount,
+          'amount': initialAmount.floor(),
+          'note': 'Initial reading',
+          'isInitial': true
         });
         waterRecords.add({
           'time': DateTime.now(),
-          'amount': consumedAmount,
+          'amount': initialAmount.floor(),
+          'note': 'Initial reading',
+          'isInitial': true
         });
-      });
-    } else if (currentVolumeML < _tempWaterConsumed) {
-      // Water level increased, reset temporary water consumed
-      setState(() {
-        _tempWaterConsumed = currentVolumeML;
-      });
+      }
+    });
+
+    print("Initial water level set: $currentReading cm, water volume: $waterVolume ml, initial amount in bottle: $initialAmount ml");
+
+    // Start collecting readings for stability check
+    _recentReadings.add(currentReading);
+  }
+
+  void _checkReadingStability(double currentReading) {
+    // Add the new reading to our recent readings list
+    _recentReadings.add(currentReading);
+
+    // Keep only the most recent readings
+    if (_recentReadings.length > _stableReadingsRequired) {
+      _recentReadings.removeAt(0);
     }
-    _previousDistance = _data; // Update previous distance
+
+    // Check if we have enough readings to determine stability
+    if (_recentReadings.length == _stableReadingsRequired) {
+      // Calculate the maximum difference between readings
+      double maxDifference = 0;
+      for (int i = 0; i < _recentReadings.length - 1; i++) {
+        for (int j = i + 1; j < _recentReadings.length; j++) {
+          double diff = (_recentReadings[i] - _recentReadings[j]).abs();
+          if (diff > maxDifference) {
+            maxDifference = diff;
+          }
+        }
+      }
+
+      // Check if readings are stable
+      bool isCurrentlyStable = maxDifference <= _stabilityThreshold;
+
+      // Calculate average of stable readings
+      double stableReading = _recentReadings.reduce((a, b) => a + b) / _recentReadings.length;
+
+      // Update bottle closed status based on stability
+      if (!isCurrentlyStable && _isBottleClosed) {
+        // Readings just became unstable - bottle might be open/in use
+        setState(() {
+          _isBottleClosed = false;
+        });
+        print("Bottle appears to be in use, readings are unstable");
+      } else if (isCurrentlyStable && !_isBottleClosed) {
+        // Readings just became stable - bottle is now closed
+        setState(() {
+          _isBottleClosed = true;
+        });
+        print("Bottle appears to be closed now, readings are stable");
+
+        // Compare with last stable reading and update water consumption
+        _updateWaterIntake(_lastStableReading, stableReading);
+
+        // Update the last stable reading
+        _lastStableReading = stableReading;
+      }
+    }
+  }
+
+  void _updateWaterIntake(double previousReading, double currentReading) {
+    // Calculate water volume change based on stable readings
+    double previousVolume = pi * bottleRadius * bottleRadius * previousReading; // Volume in cm³
+    double currentVolume = pi * bottleRadius * bottleRadius * currentReading; // Volume in cm³
+
+    // Update the tempWaterConsumed to reflect current water level
+    setState(() {
+      _tempWaterConsumed = bottleCapacity - currentVolume;
+    });
+
+    // Only process if there's a meaningful difference (water consumed)
+    if (previousVolume > currentVolume && (previousVolume - currentVolume) > 1.0) {
+      // Water level decreased, calculate water consumed
+      int consumedAmount = (previousVolume - currentVolume).floor();
+
+      if (consumedAmount > 0) {
+        setState(() {
+          waterConsumed += consumedAmount;
+
+          dailyWaterRecords.add({
+            'time': DateTime.now(),
+            'amount': consumedAmount,
+            'isInitial': false // Regular consumption record
+          });
+
+          waterRecords.add({
+            'time': DateTime.now(),
+            'amount': consumedAmount,
+            'isInitial': false // Regular consumption record
+          });
+        });
+
+        print("Water consumed: $consumedAmount ml");
+      }
+    } else if (previousVolume < currentVolume && (currentVolume - previousVolume) > 10.0) {
+      // Water level increased significantly, bottle was likely refilled
+      print("Bottle appears to have been refilled");
+
+      // Reset the refill alert flag when the bottle is refilled
+      setState(() {
+        _hasShownRefillAlert = false;
+      });
+
+      // If refilled, show an alert or handle refill logic
+      if ((currentVolume - previousVolume) > bottleCapacity * 0.2) {
+        _showRefillAlert();
+      }
+    }
   }
 
   void _showRefillAlert() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
+          backgroundColor: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.local_drink, size: 60, color: Color.fromRGBO(7, 134, 232, 1)),
+                const SizedBox(height: 10),
+                const Text(
+                  "Bottle Refilled",
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  "We've detected that you've refilled your bottle. Tracking will continue automatically.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16, color: Colors.black87),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      // Reset temporary water consumed based on current reading
+                      double currentVolume = pi * bottleRadius * bottleRadius * _lastStableReading;
+                      _tempWaterConsumed = bottleCapacity - currentVolume;
+                    });
+                    Navigator.of(context).pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color.fromRGBO(7, 134, 232, 1),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                  ),
+                  child: const Text("OK", style: TextStyle(fontSize: 16, color: Colors.white)),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showLowWaterAlert() {
+    // Only show if we haven't already shown the alert
+    if (_hasShownRefillAlert) return;
+
+    setState(() {
+      _hasShownRefillAlert = true; // Set the flag to prevent showing again
+    });
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -122,16 +344,13 @@ class _WaterIntakeViewState extends State<WaterIntakeView> with SingleTickerProv
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  "You do not have sufficient water. Please refill to continue tracking water intake.",
+                  "Your bottle is almost empty. Please refill to continue tracking water intake.",
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 16, color: Colors.black87),
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: () {
-                    setState(() {
-                      _tempWaterConsumed = 0; // Reset temporary water consumed
-                    });
                     Navigator.of(context).pop();
                   },
                   style: ElevatedButton.styleFrom(
@@ -139,7 +358,7 @@ class _WaterIntakeViewState extends State<WaterIntakeView> with SingleTickerProv
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
                   ),
-                  child: const Text("Refill", style: TextStyle(fontSize: 16, color: Colors.white)),
+                  child: const Text("OK", style: TextStyle(fontSize: 16, color: Colors.white)),
                 ),
               ],
             ),
@@ -156,6 +375,7 @@ class _WaterIntakeViewState extends State<WaterIntakeView> with SingleTickerProv
       appBar: AppBar(
         backgroundColor: const Color(0xFF1F5ACE), // Lighter dark blue
         title: const Text("Water Intake",style: TextStyle(color: Colors.white),),
+        automaticallyImplyLeading: false,
       ),
       body: Column(
         children: [
@@ -181,6 +401,8 @@ class _WaterIntakeViewState extends State<WaterIntakeView> with SingleTickerProv
                     tempWaterConsumed: _tempWaterConsumed,
                     waterRecords: dailyWaterRecords,
                     data: _data, // Pass the data to the content widget
+                    isBottleClosed: _isBottleClosed, // Pass bottle status
+                    onLowWaterAlert: _showLowWaterAlert,
                   ),
                 ),
                 WaterHistoryView(
@@ -202,6 +424,8 @@ class WaterIntakeContent extends StatelessWidget {
   final double tempWaterConsumed;
   final List<Map<String, dynamic>> waterRecords;
   final double data;
+  final bool isBottleClosed;
+  final VoidCallback onLowWaterAlert;
 
   const WaterIntakeContent({
     super.key,
@@ -211,11 +435,20 @@ class WaterIntakeContent extends StatelessWidget {
     required this.tempWaterConsumed,
     required this.waterRecords,
     required this.data,
+    required this.isBottleClosed,
+    required this.onLowWaterAlert,
   });
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    // Check if water is low and show alert if needed
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if ((bottleCapacity - tempWaterConsumed) < 100) {
+        onLowWaterAlert();
+      }
+    });
+
     return Column(
       children: [
         SizedBox(height: screenWidth * 0.05),
@@ -305,6 +538,48 @@ class WaterIntakeContent extends StatelessWidget {
         const SizedBox(height: 20),
         _buildRemainingDisplay(),
         const SizedBox(height: 20),
+
+        // Bottle status indicator
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Card(
+            elevation: 5,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            child: Container(
+              padding: const EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: isBottleClosed
+                      ? [Colors.green.shade300, Colors.green.shade600]
+                      : [Colors.orange.shade300, Colors.orange.shade600],
+                ),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    isBottleClosed ? Icons.check_circle : Icons.access_time,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    isBottleClosed
+                        ? "Bottle Closed - Tracking Active"
+                        : "Bottle In Use - Waiting for Stability",
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 15),
 
         // Warning Card when water remaining is below 100ml
         if ((bottleCapacity - tempWaterConsumed) < 100)
@@ -407,7 +682,7 @@ class WaterIntakeContent extends StatelessWidget {
           ),
           _buildWaterInfoCard(
             "Water Left",
-            "${(bottleCapacity - tempWaterConsumed).toInt()} ml",
+            "${(bottleCapacity - tempWaterConsumed).toInt().clamp(0, bottleCapacity.toInt()) + 36} ml",
             Colors.green,
             Icons.local_drink,
           ),
@@ -417,14 +692,18 @@ class WaterIntakeContent extends StatelessWidget {
   }
 
   Widget _buildTodaysRecord() {
+    // Filter out the initial reading from the displayed records
+    final filteredRecords = waterRecords.where((record) => record['isInitial'] != true).toList();
+
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: waterRecords.length,
+      itemCount: filteredRecords.length,
       itemBuilder: (context, index) {
-        final record = waterRecords.reversed.toList()[index]; // Reverse the list
+        final record = filteredRecords.reversed.toList()[index]; // Reverse the list
         final time = DateFormat('yyyy-MM-dd – HH:mm').format(record['time']);
         final amount = record['amount'];
+        final note = record['note'] ?? '';
 
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 20),
@@ -433,7 +712,7 @@ class WaterIntakeContent extends StatelessWidget {
           child: ListTile(
             leading: const Icon(Icons.water_drop, color: Colors.blueAccent),
             title: Text("$amount ml"),
-            subtitle: Text("at $time"),
+            subtitle: Text("at $time ${note.isNotEmpty ? '• $note' : ''}"),
             trailing: const Icon(Icons.check_circle, color: Colors.green),
           ),
         );
