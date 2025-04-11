@@ -1,10 +1,14 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:nutritrack_v2/views/bmr_view.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:percent_indicator/linear_percent_indicator.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/auth_viewmodel.dart';
+import '../viewmodels/user_details_viewmodel.dart';
 import 'food_detail_view.dart';
+import 'package:http/http.dart' as http;
 
 class DashboardView extends StatefulWidget {
   const DashboardView({super.key});
@@ -14,10 +18,11 @@ class DashboardView extends StatefulWidget {
 }
 
 class _DashboardViewState extends State<DashboardView> {
+
   int _selectedIndex = 0;
 
   late double caloriesConsumed = 0;
-  final double calorieGoal = 2245;
+  late double calorieGoal = 2245;
   late double proteinConsumed = 0;
   final double proteinGoal = 60;
   late double carbConsumed = 0;
@@ -29,16 +34,6 @@ class _DashboardViewState extends State<DashboardView> {
   List<String> lunchItems = [];
   List<String> dinnerItems = [];
 
-  static const Map<String, Map<String, double>> foodNutritionData = {
-    "Apple": {"calories": 95, "protein": 0.5, "carbs": 25, "fat": 0.3},
-    "Banana": {"calories": 105, "protein": 1.3, "carbs": 27, "fat": 0.3},
-    "Chicken": {"calories": 165, "protein": 31, "carbs": 0, "fat": 3.6},
-    "Rice": {"calories": 206, "protein": 4.3, "carbs": 45, "fat": 0.4},
-    "Broccoli": {"calories": 55, "protein": 3.7, "carbs": 11.2, "fat": 0.6},
-    // Add more as needed
-  };
-
-
   void _showFoodSearchDialog(String mealType) async {
     final result = await Navigator.push(
       context,
@@ -49,17 +44,17 @@ class _DashboardViewState extends State<DashboardView> {
 
     if (result != null && result is Map<String, dynamic>) {
       setState(() {
-        final food = result['food'] as String;
+        final foodMap = result['food'] as Map<String, dynamic>;
+        print("Food MAP : " + foodMap['Name']);
+        print(foodMap['Calories']);
+        final food = foodMap['Name'];
         final servings = result['servings'] as int;
         final foodWithServings = "$food (x$servings)";
 
-        final foodData = foodNutritionData[food];
-        if (foodData != null) {
-          caloriesConsumed += (foodData["calories"]! * servings);
-          proteinConsumed += (foodData["protein"]! * servings);
-          carbConsumed += (foodData["carbs"]! * servings);
-          fatConsumed += (foodData["fat"]! * servings);
-        }
+        caloriesConsumed += (foodMap["Calories"] * servings);
+        proteinConsumed += (foodMap["ProteinContent"] * servings);
+        carbConsumed += (foodMap["CarbohydrateContent"] * servings);
+        fatConsumed += (foodMap["FatContent"] * servings);
 
         if (mealType == "Breakfast") {
           breakfastItems.add(foodWithServings);
@@ -77,6 +72,10 @@ class _DashboardViewState extends State<DashboardView> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final authViewModel = Provider.of<AuthViewModel>(context, listen: true);
+    final userDetailsViewModel = Provider.of<UserDetailsViewModel>(context);
+    final prediction = userDetailsViewModel.predictionResponse;
+
+    calorieGoal = prediction?["adjusted_calories"];
 
     return Scaffold(
       backgroundColor: Color.fromRGBO(250, 236, 217, 1),
@@ -95,7 +94,7 @@ class _DashboardViewState extends State<DashboardView> {
               alignment: Alignment.center,
               child: Text(
                 "Hey ${authViewModel.user?.email ?? ''}",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color.fromRGBO(232, 134, 7, 1)),
               ),
             ),
             Container(
@@ -106,7 +105,7 @@ class _DashboardViewState extends State<DashboardView> {
                 child: Text(
                   "Today's Intake",
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 17),
+                  style: TextStyle(fontSize: 16, color: Colors.grey.shade700),
                 ),
               ),
             ),
@@ -168,57 +167,48 @@ class _DashboardViewState extends State<DashboardView> {
           ],
         ),
       ),
-      // bottomNavigationBar: BottomNavigationBar(
-      //   items: const <BottomNavigationBarItem>[
-      //     BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-      //     BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
-      //     BottomNavigationBarItem(icon: Icon(Icons.settings), label: "Settings"),
-      //   ],
-      //   currentIndex: _selectedIndex,
-      //   selectedItemColor: Color.fromRGBO(232, 134, 7, 1),
-      //   onTap: (index) {
-      //     setState(() {
-      //       _selectedIndex = index;
-      //     });
-      //   },
-      // ),
     );
   }
 
   Widget _buildNutrientBar(String label, double consumed, double goal, Color color) {
     return Container(
-      color: Color.fromRGBO(255, 223, 179, 1),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "$label ${consumed.toInt()}g / ${goal.toInt()}g",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 5),
-            LinearPercentIndicator(
-              lineHeight: 16.0,
-              percent: (consumed / goal).clamp(0.0, 1.0),
-              backgroundColor: Colors.grey.shade300,
-              progressColor: color,
-              barRadius: Radius.circular(5),
-            ),
-          ],
-        ),
+      margin: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [BoxShadow(color: Colors.grey.shade200, blurRadius: 6, offset: Offset(0, 3))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "$label: ${consumed.toInt()}g / ${goal.toInt()}g",
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey[800]),
+          ),
+          SizedBox(height: 10),
+          LinearPercentIndicator(
+            animation: true,
+            lineHeight: 14.0,
+            percent: (consumed / goal).clamp(0.0, 1.0),
+            backgroundColor: Colors.grey.shade300,
+            progressColor: color,
+            barRadius: Radius.circular(10),
+          ),
+        ],
       ),
     );
   }
 
+
   Widget _buildMealSection(String mealType, List<String> items) {
     return Container(
-      margin: EdgeInsets.all(10),
-      padding: EdgeInsets.all(10),
+      margin: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 5)],
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [BoxShadow(color: Colors.grey.shade200, blurRadius: 6, offset: Offset(0, 3))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -228,10 +218,10 @@ class _DashboardViewState extends State<DashboardView> {
             children: [
               Text(
                 mealType,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange.shade800),
               ),
               IconButton(
-                icon: Icon(Icons.add_circle, color: Colors.orange),
+                icon: Icon(Icons.add_circle, color: Colors.orange.shade700),
                 onPressed: () => _showFoodSearchDialog(mealType),
               ),
             ],
@@ -242,22 +232,12 @@ class _DashboardViewState extends State<DashboardView> {
             final servings = parts.length > 1 ? parts[1].replaceAll(')', '') : '1';
 
             return ListTile(
-              title: Text(foodEntry),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
               leading: Icon(Icons.fastfood, color: Colors.orange),
+              title: Text(foodEntry, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
               onTap: () async {
-                final updatedServings = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => FoodDetailView(foodName: foodName),
-                  ),
-                );
-
-                if (updatedServings != null) {
-                  setState(() {
-                    items.remove(foodEntry); // Remove old entry
-                    items.add('$foodName (x$updatedServings)'); // Add updated entry
-                  });
-                }
+                // Existing logic...
               },
             );
           }),
@@ -265,6 +245,7 @@ class _DashboardViewState extends State<DashboardView> {
       ),
     );
   }
+
 }
 
 class FoodSearchDialog extends StatefulWidget {
@@ -274,74 +255,83 @@ class FoodSearchDialog extends StatefulWidget {
 
 class _FoodSearchDialogState extends State<FoodSearchDialog> {
   final TextEditingController _searchController = TextEditingController();
-  List<String> foodList = [
-    "Apple", "Banana", "Chicken", "Rice", "Broccoli", "Salmon", "Egg", "Milk", "Oatmeal", "Avocado"
-  ];
-  List<String> filteredFoods = [];
+  List<dynamic> searchResults = [];
 
-  @override
-  void initState() {
-    super.initState();
-    filteredFoods = List.from(foodList);
-  }
+  void _performSearch(String query) async {
+    print("Checking!");
+    if (query.isEmpty) {
+      setState(() {
+        searchResults = [];
+      });
+      return;
+    }
 
-  void _filterFoodList(String query) {
-    setState(() {
-      filteredFoods = foodList
-          .where((food) => food.toLowerCase().contains(query.toLowerCase()))
-          .toList();
-    });
+    final response = await http.get(Uri.parse("http://10.0.2.2:5000/search?query=$query"));
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final List<dynamic> results = data["results"];
+
+      setState(() {
+        searchResults = results;
+      });
+
+    } else {
+      // Handle error
+      setState(() {
+        searchResults = [];
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-
     return Scaffold(
       appBar: AppBar(
+        title: Text("Search Food"),
         backgroundColor: Color.fromRGBO(247, 186, 106, 1),
-        title: Text("Select Food"),
       ),
       backgroundColor: Color.fromRGBO(250, 236, 217, 1),
       body: Padding(
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           children: [
             TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                labelText: "Search Food",
-                labelStyle: TextStyle(color: Colors.orange),
-                border: OutlineInputBorder(),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Color.fromRGBO(247, 186, 106, 1), width: 2.0),
-                  borderRadius: BorderRadius.circular(10.0),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Color.fromRGBO(232, 134, 7, 1), width: 2.5),
-                  borderRadius: BorderRadius.circular(10.0),
-                ),
+                prefixIcon: Icon(Icons.search, color: Colors.orange),
+                hintText: "Search for food...",
+                hintStyle: TextStyle(color: Colors.orange.shade300),
                 filled: true,
                 fillColor: Colors.white,
+                contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.orange.shade200),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.orange, width: 2),
+                ),
               ),
-              onChanged: _filterFoodList,
+              onChanged: _performSearch,
             ),
             SizedBox(height: 20),
             Expanded(
               child: ListView.builder(
-                itemCount: filteredFoods.length,
+                itemCount: searchResults.length,
                 itemBuilder: (context, index) {
-                  final food = filteredFoods[index];
+                  final food = searchResults[index] as Map<String, dynamic>;
                   return ListTile(
                     title: Text(
-                      food,
+                      food["Name"],
                       style: TextStyle(fontWeight: FontWeight.bold, color: Color.fromRGBO(232, 134, 7, 1)),
                     ),
                     onTap: () async {
                       final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => FoodDetailView(foodName: food),
+                          builder: (context) => FoodDetailView(foodName: food["Name"], foodData: food,),
                         ),
                       );
 
@@ -355,13 +345,14 @@ class _FoodSearchDialogState extends State<FoodSearchDialog> {
                   );
                 },
               ),
-            ),
+            )
           ],
         ),
       ),
     );
   }
 }
+
 
 
 
