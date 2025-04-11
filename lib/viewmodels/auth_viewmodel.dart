@@ -11,19 +11,24 @@ class AuthViewModel extends ChangeNotifier {
   Future<bool> signUp(String email, String password) async {
     final userCredential = await _authService.signUpWithEmail(email, password);
     if (userCredential != null) {
-      user = UserModel(uid: userCredential.uid, email: userCredential.email!);
+      user = UserModel(
+        uid: userCredential.uid,
+        email: userCredential.email!,
+        height: null,
+        weight: null,
+        dateOfBirth: null,
+        bloodGroup: null,
+        activityLevel: null,
+        gender: null,
+        hasHeartCondition: null,
+        wantsMuscleGain: null,
+        hasDiabetes: null,
+        weightGoal: null,
+        weeks: null,
+      );
 
-      // Store user data in Firestore
-      await _firestore.collection('users').doc(user!.uid).set({
-        'uid': user!.uid,
-        'email': user!.email,
-        'height': null,  // Default placeholders
-        'weight': null,
-        'dateOfBirth': null,
-        'bloodGroup': null,
-        'activityLevel': null,
-        'gender': null,
-      });
+      // Store user data in Firestore with all fields
+      await _firestore.collection('users').doc(user!.uid).set(user!.toJson());
 
       notifyListeners();
       return true;
@@ -34,7 +39,15 @@ class AuthViewModel extends ChangeNotifier {
   Future<bool> login(String email, String password) async {
     final userCredential = await _authService.signInWithEmail(email, password);
     if (userCredential != null) {
-      user = UserModel(uid: userCredential.uid, email: userCredential.email!);
+      // ✅ Fetch full user data from Firestore
+      final userDoc = await _firestore.collection('users').doc(userCredential.uid).get();
+      if (userDoc.exists) {
+        user = UserModel.fromJson(userDoc.data()!);
+      } else {
+        // fallback if document is missing
+        user = UserModel(uid: userCredential.uid, email: userCredential.email!);
+      }
+
       notifyListeners();
       return true;
     }
