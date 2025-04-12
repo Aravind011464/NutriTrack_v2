@@ -46,27 +46,10 @@ class _DietChartPageState extends State<DietChartPage> {
   }
 
   Future<void> fetchRecommendation() async {
-    final url = Uri.parse('http://10.0.2.2:5050/recommend');
+    final url = Uri.parse('http://10.0.2.2:5000/recommend');
 
     try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          "attributes": {
-            "age": widget.age,
-            "weight": widget.weight,
-            "height": widget.height / 100,
-            "BMI": widget.weight / ((widget.height / 100) * (widget.height / 100)),
-            "BMR": widget.bmr,
-            "activity_level": widget.activityLevel,
-            "gender_F": widget.gender.toLowerCase() == 'female' ? 1 : 0,
-            "gender_M": widget.gender.toLowerCase() == 'male' ? 1 : 0
-          },
-          "weight_goal_kg": widget.weightToLose,
-          "weeks": widget.weeksNeeded
-        }),
-      );
+      final response = await http.get(url);
 
       if (response.statusCode == 200) {
         setState(() {
@@ -79,6 +62,7 @@ class _DietChartPageState extends State<DietChartPage> {
       print('Error fetching recommendation: $e');
     }
   }
+
 
   List<String> _parseList(dynamic input) {
     if (input is String) {
@@ -111,80 +95,30 @@ class _DietChartPageState extends State<DietChartPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Calories Information',
+                    const Text('Recommended Meals',
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text('Adjusted Calories: ${recommendation!['adjusted_calories']?.toStringAsFixed(2) ?? 'N/A'}'),
-                    Text('Base Calories: ${recommendation!['base_calories']?.toStringAsFixed(2) ?? 'N/A'}'),
-                  ],
-                ),
-              ),
-            ),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Macronutrient Targets',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    ...?recommendation?['macronutrient_targets']?.entries.map((entry) {
-                      return Text('${capitalize(entry.key)}: ${entry.value?.toStringAsFixed(2) ?? 'N/A'}');
-                    }),
-                  ],
-                ),
-              ),
-            ),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Recommended Foods',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    ...?recommendation?['recommended_foods']?.map<Widget>((mealData) {
+                    ...recommendation!.entries.map((entry) {
+                      final mealType = entry.key;
+                      final mealData = entry.value;
+                      final name = mealData['name'] ?? 'Unknown';
+                      final macros = mealData['estimated_macros'] ?? {};
+                      final quantity = mealData['estimated_quantity_g']?.toStringAsFixed(2) ?? 'N/A';
+
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('${mealData['meal'] ?? 'Meal'}',
-                              style: const TextStyle(fontWeight: FontWeight.bold)),
-                          ...?mealData['foods']?.map<Widget>((food) {
-                            return GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => ERecipePage(
-                                      foodName: food['name'] ?? 'Unknown',
-                                      description: food['description'] ?? 'No description available',
-                                      steps: _parseList(food['steps']),
-                                      ingredients: _parseList(food['ingredients']),
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: Card(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(food['name'] ?? 'Unknown Food',
-                                          style: const TextStyle(fontWeight: FontWeight.bold)),
-                                      Text('Calories: ${food['nutrition']?['calories'] ?? 'N/A'}'),
-                                      Text('Protein: ${food['nutrition']?['protein'] ?? 'N/A'}g'),
-                                      Text('Saturated Fat: ${food['nutrition']?['saturated_fat'] ?? 'N/A'}g'),
-                                      Text('Carbs: ${food['nutrition']?['carbohydrates'] ?? 'N/A'}g'),
-                                      Text('Fat: ${food['nutrition']?['total_fat'] ?? 'N/A'}g'),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
+                          const SizedBox(height: 12),
+                          Text(capitalize(mealType),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Text('Name: $name'),
+                          Text('Quantity: $quantity g'),
+                          ...macros.entries.map((macro) {
+                            return Text(
+                                '${capitalize(macro.key.replaceAll("_", " "))}: ${macro.value}');
                           }),
                         ],
                       );
-                    }),
+                    }).toList(),
                   ],
                 ),
               ),
