@@ -1,16 +1,25 @@
-# nutritrack_v2
+# 🍎 NutriTrack
 
-A new Flutter project.
+**NutriTrack** is a Flutter-based mobile application designed to help users track their daily diet and water intake, while also recommending personalized diet charts based on their goals. It offers a clean, interactive dashboard to visualize macro-nutrient consumption and encourages users to stay consistent with their health goals.
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## 🚀 Features
 
-A few resources to get you started if this is your first Flutter project:
+- 🥗 **Track Daily Meals**: Log breakfast, lunch, dinner, and snacks with calorie, protein, carbs, and fat breakdown.
+- 💧 **Water Intake Monitor**: Set hydration goals and track water consumption throughout the day.
+- 📊 **Nutrition Dashboard**: Visual progress bars for daily calorie and macro-nutrient goals.
+- 🧠 **Smart Diet Recommendations**: Personalized meal suggestions based on user profile, goals, and activity level.
+- 🔒 **User Authentication**: Firebase authentication for secure login and user-specific data.
+- ☁️ **Cloud Storage**: Firebase Firestore integration to store meal and user data.
+- 🕹️ **MVVM Architecture**: Clean, maintainable, and scalable codebase.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+---
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 🛠️ Tech Stack
+
+- **Frontend**: Flutter, Dart  
+- **Backend**: Firebase (Authentication, Firestore, Storage)  
+- **Architecture**: MVVM (Model-View-ViewModel)
+
+
